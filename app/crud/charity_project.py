@@ -15,8 +15,8 @@ class CRUDCharityProject(CRUDBase):
             select(CharityProject).where(
                 CharityProject.fully_invested
             ).order_by(
-                func.DATE(CharityProject.close_date) -
-                func.DATE(CharityProject.create_date)
+                func.extract('epoch', CharityProject.close_date) -
+                func.extract('epoch', CharityProject.create_date)
             )
         )
         return charity_project.scalars().all()

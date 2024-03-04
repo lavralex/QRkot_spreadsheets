@@ -66,7 +66,7 @@ async def spreadsheets_update_value(
         ['Топ проектов по скорости закрытия'],
         ['Название проекта', 'Время сбора', 'Описание']
     ]
-    for project in reversed(carity_projects):
+    for project in carity_projects:
         new_row = [
             str(project.name),
             str(project.close_date - project.create_date),

@@ -8,7 +8,7 @@ from app.core.user import current_superuser
 from app.core.constants import SPREADSHEET_LINK
 from app.crud.charity_project import charity_project_crud
 from app.schemas.google_schema import Googl
-from app.services.google_api import spreadsheets_create, set_user_permissions, spreadsheets_update_value
+from app.services.google_api import create_and_fill_spreadsheet
 
 router = APIRouter()
 
@@ -27,15 +27,12 @@ async def get_report(
     """Только для суперюзеров.
         Создает Google таблицу с топом самых быстрых по закрытию проектов
     """
-    spreadsheet_id = await spreadsheets_create(wrapper_services)
-    await set_user_permissions(spreadsheet_id, wrapper_services)
     charity_projects = await (
         charity_project_crud.get_projects_by_completion_rate(session)
     )
-    missed_projects_count = await spreadsheets_update_value(
-        spreadsheet_id,
-        charity_projects,
-        wrapper_services
+    missed_projects_count, spreadsheet_id = await create_and_fill_spreadsheet(
+        wrapper_services,
+        charity_projects
 
     )
     if not missed_projects_count:

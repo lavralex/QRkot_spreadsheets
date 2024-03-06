@@ -1,4 +1,5 @@
 from datetime import datetime
+from copy import deepcopy
 
 from aiogoogle import Aiogoogle
 from app.core.config import settings
@@ -10,13 +11,17 @@ from app.core.constants import (
 )
 
 
-async def spreadsheets_create(wrapper_services: Aiogoogle) -> str:
-    now_date_time = datetime.now().strftime(FORMAT)
-    service = await wrapper_services.discover('sheets', SHEETS_VERSION)
-    spreadsheet_body = SPREADSHEET_BODY.copy()
-    title = f'{TITLE} {now_date_time}'
+def get_spreadsheet_body(date_time) -> dict:
+    spreadsheet_body = deepcopy(SPREADSHEET_BODY)
+    title = f'{TITLE} {date_time}'
     spreadsheet_body['properties']['title'] = title
     spreadsheet_body['sheets'][0]['properties']['title'] = title
+    return spreadsheet_body
+
+
+async def spreadsheets_create(wrapper_services: Aiogoogle, date_time) -> str:
+    service = await wrapper_services.discover('sheets', SHEETS_VERSION)
+    spreadsheet_body = get_spreadsheet_body(date_time)
     response = await wrapper_services.as_service_account(
         service.spreadsheets.create(json=spreadsheet_body)
     )
@@ -42,10 +47,17 @@ async def set_user_permissions(
         ))
 
 
+def get_table_values(date_time) -> list:
+    table_values = deepcopy(UPDATE_BODY_VALUES)
+    table_values[0][1] = date_time
+    return table_values
+
+
 async def spreadsheets_update_value(
         spreadsheet_id: str,
         charity_projects: list,
-        wrapper_services: Aiogoogle
+        wrapper_services: Aiogoogle,
+        date_time
 ) -> None:
     free_rows = ROW_COUNT - len(UPDATE_BODY_VALUES)
     charity_projects_count = len(charity_projects)
@@ -53,10 +65,8 @@ async def spreadsheets_update_value(
     if len(charity_projects) > free_rows:
         missed_projects_count = charity_projects_count - free_rows
         charity_projects = charity_projects[:free_rows]
-    now_date_time = datetime.now().strftime(FORMAT)
     service = await wrapper_services.discover('sheets', SHEETS_VERSION)
-    table_values = UPDATE_BODY_VALUES.copy()
-    table_values[0][1] = now_date_time
+    table_values = get_table_values(date_time)
     for project in charity_projects:
         new_row = [
             str(project.name),
@@ -78,3 +88,19 @@ async def spreadsheets_update_value(
         )
     )
     return missed_projects_count
+
+
+async def create_and_fill_spreadsheet(
+        wrapper_services: Aiogoogle,
+        charity_projects: list
+):
+    now_date_time = datetime.now().strftime(FORMAT)
+    spreadsheet_id = await spreadsheets_create(wrapper_services, now_date_time)
+    await set_user_permissions(spreadsheet_id, wrapper_services)
+    missed_projects_count = await spreadsheets_update_value(
+        spreadsheet_id,
+        charity_projects,
+        wrapper_services,
+        now_date_time
+    )
+    return missed_projects_count, spreadsheet_id
